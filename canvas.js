@@ -51,16 +51,15 @@ const relativeToReal = new class {
     };
 
     convert(vector) {
-        console.log(this.multiplier, this.xOffset, this.yOffset);
-        return new Vector2(vector.x * this.multiplier - this.xOffset, vector.y * this.multiplier - this.yOffset);
+        return new Vector2((vector.x * this.multiplier) - this.xOffset, (vector.y * this.multiplier) - this.yOffset);
     };
 
     convertX(x) {
-        return x * this.multiplier - this.xOffset
+        return (x * this.multiplier) - this.xOffset
     };
 
     convertY(y) {
-        return y * this.multiplier - this.yOffset
+        return (y * this.multiplier) - this.yOffset
     };
 };
 
@@ -71,8 +70,8 @@ const borders = new class {
             this.bottom = window.innerHeight * (15/16);
             relativeToReal.yOffset = this.top;
 
-            let relativeWidth = ((window.innerHeight * (14/16)) / currentLevel.height) * currentLevel.width;
-            relativeToReal.multiplier = relativeWidth / currentLevel.width;
+            let relativeWidth = window.innerHeight * (14/16) / currentLevel.height * currentLevel.width;
+            relativeToReal.multiplier = (window.innerHeight * (14/16)) / currentLevel.height;
 
             this.left   = (window.innerWidth - relativeWidth) / 2;
             this.right  = window.innerWidth - ((window.innerWidth - relativeWidth) / 2);
@@ -83,7 +82,7 @@ const borders = new class {
             relativeToReal.xOffset = this.left;
 
             let relativeHeight = window.innerWidth * (14/16) / currentLevel.width * currentLevel.height;
-            relativeToReal.multiplier = relativeHeight / currentLevel.height;
+            relativeToReal.multiplier = (window.innerWidth * (14/16)) / currentLevel.width;
 
             this.top   = (window.innerHeight - relativeHeight) / 2;
             this.bottom  = window.innerHeight - (window.innerHeight - relativeHeight) / 2;
@@ -135,7 +134,6 @@ function initEventListeners() {
 
     window.addEventListener("keydown",
     function(event) {
-        console.log(event.key.toLowerCase());
         switch (event.key.toLowerCase()) {
             case "w":
                 keyPresses.w = true;
@@ -187,7 +185,7 @@ const player = new class {
         this.realPos            = relativeToReal.convert(this.relativePos);
         this.gravityStrength    = 1;
         this.velocity           = new Vector2(0,0);
-        this.relativeSidelength = 16;
+        this.relativeSideLength = 20;
         this.colour             = "Black";
         this.canJump            = false;
     };
@@ -197,31 +195,31 @@ const player = new class {
         ctx.strokeStyle = this.colour;
         ctx.fillStyle = this.colour;
 
-        let halfSideLength = this.sidelength * relativeToReal.multiplier / 2
+        let halfSideLength = this.relativeSideLength * relativeToReal.multiplier / 2;
 
         ctx.moveTo(this.realPos.x - halfSideLength, this.realPos.y + halfSideLength);
         ctx.lineTo(this.realPos.x + halfSideLength, this.realPos.y + halfSideLength);
-        ctx.lineTo(this.realPos.x + halfSideLength + this.velocity.x, this.realPos.y - halfSideLength);
-        ctx.lineTo(this.realPos.x - halfSideLength + this.velocity.x, this.realPos.y - halfSideLength);
+        ctx.lineTo(this.realPos.x + halfSideLength + (this.velocity.x * relativeToReal.multiplier), this.realPos.y - halfSideLength);
+        ctx.lineTo(this.realPos.x - halfSideLength + (this.velocity.x * relativeToReal.multiplier), this.realPos.y - halfSideLength);
         ctx.lineTo(this.realPos.x - halfSideLength, this.realPos.y + halfSideLength);
         ctx.fill();
     };
 
     processKeyPresses() {
-        if (keyPresses.a && keyPresses.d == false) {
+        if (keyPresses.a && !keyPresses.d) {
             this.velocity.x -= 1.5;
-        } else if (keyPresses.d && keyPresses.a == false) {
+        } else if (keyPresses.d && !keyPresses.a) {
             this.velocity.x += 1.5;
         } else {
             if (this.velocity.x < -0.5 || this.velocity.x > 0.5) {
-            this.velocity.x /= 1.2;
+                this.velocity.x /= 1.2;
             } else {
                 this.velocity.x = 0;
             }
         }
 
         if ((keyPresses.space || keyPresses.w) && this.canJump) {
-            this.velocity.y = this.sidelength * -2;
+            this.velocity.y = this.relativeSideLength * -2;
             this.canJump = false;
         }
 
@@ -234,28 +232,31 @@ const player = new class {
 
     processCollisions() {
         this.canJump = false;
-        if (this.realPos.y + this.velocity.y > (borders.bottom - (this.sidelength / 2))) {
+        if (this.relativePos.y + this.velocity.y > currentLevel.height - (this.relativeSideLength / 2)) {
             this.velocity.y = 0;
-            this.realPos.y = borders.bottom - (this.sidelength / 2);
+            this.relativePos.y = currentLevel.height - (this.relativeSideLength / 2);
             this.canJump = true;
-        } else if (this.realPos.y + this.velocity.y < (borders.top + (this.sidelength / 2))) {
+        } else if (this.relativePos.y + this.velocity.y < this.relativeSideLength / 2) {
             this.velocity.y = 0;
-            this.realPos.y = borders.top + (this.sidelength / 2);
-        }
-
-        if (this.realPos.x + this.velocity.x < (borders.left + (this.sidelength / 2))) {
+            this.relativePos.y = this.relativeSideLength / 2;
+        };
+        
+        if (this.relativePos + this.velocity.x < this.relativeSideLength / 2) {
             this.velocity.x = 0;
-            this.realPos.x = borders.left + (this.sidelength / 2);
-        } else if (this.realPos.x + this.velocity.x > (borders.right - (this.sidelength / 2))) {
+            this.relativePos.x = this.relativeSideLength / 2;
+        } else if (this.relativePos.x + this.velocity.x > currentLevel.width - (this.relativeSideLength / 2)) {
             this.velocity.x = 0;
-            this.realPos.x = borders.right - (this.sidelength / 2);
-        }
+            this.relativePos.x = currentLevel.width - (this.relativeSideLength / 2);
+        };
 
         // Make code for collisions with platforms and blocks here
+        // Again, have fun future me :)
     };
 
     update() {
         this.processKeyPresses()
+
+        this.velocity.y += this.gravityStrength / 2;
 
         // Enforce speed Limit
         if (this.velocity.x >= 10) {
@@ -270,13 +271,15 @@ const player = new class {
             this.velocity.y = -10;
         }
 
-        this.relativePos.x += this.velocity.x * this.sidelength;
+        this.relativePos.x += this.velocity.x;
         this.relativePos.y += this.velocity.y;
-        this.velocity.y += this.gravityStrength / 2;
+
+        this.processCollisions()
+
+        console.log(this.relativePos);
 
         this.realPos = relativeToReal.convert(this.relativePos);
 
-        this.processCollisions()
         this.draw();
     };
 };
@@ -291,3 +294,9 @@ function animate() {
 };
 
 animate();
+
+/*
+Things which could be messing it up:
+  - I have no clue, could be anything.
+  - Have fun, future me ¯\_(ツ)_/¯
+*/
