@@ -31,16 +31,29 @@ class Level {
     };
 
     loadRoom(roomIndex) {
+        if (roomIndex >= this.roomsList.length) {return false};
         this.currentRoom = this.roomsList[roomIndex];
-        borders.reEvaluate();
-    };
-
-    draw() {
-        undefined
+        borders.reEvaluate(game.current.width, game.current.height);
     };
 };
 
 let currentLevel = new Level(200, 100);
+
+const game = new class{
+    constructor() {
+        this.current = {
+            width: 200, // Change width and height once this is in proper use
+            height: 100,
+            levelID: undefined,
+            roomID: undefined
+        };
+        this.levelList = [/* Levels go in this array. */];
+    };
+
+    drawBorders() {
+
+    }
+};
 
 const relativeToReal = new class {
     constructor() {
@@ -51,27 +64,27 @@ const relativeToReal = new class {
     };
 
     convert(vector) {
-        return new Vector2((vector.x * this.multiplier) - this.xOffset, (vector.y * this.multiplier) - this.yOffset);
+        return new Vector2((vector.x * this.multiplier) + this.xOffset, (vector.y * this.multiplier) + this.yOffset);
     };
 
     convertX(x) {
-        return (x * this.multiplier) - this.xOffset
+        return (x * this.multiplier) + this.xOffset
     };
 
     convertY(y) {
-        return (y * this.multiplier) - this.yOffset
+        return (y * this.multiplier) + this.yOffset
     };
 };
 
 const borders = new class {
-    reEvaluate() {
-        if (window.innerWidth / window.innerHeight > currentLevel.width / currentLevel.height) {
+    reEvaluate(width, height) {
+        if (window.innerWidth / window.innerHeight > width / height) {
             this.top    = window.innerHeight / 16;
             this.bottom = window.innerHeight * (15/16);
             relativeToReal.yOffset = this.top;
 
-            let relativeWidth = window.innerHeight * (14/16) / currentLevel.height * currentLevel.width;
-            relativeToReal.multiplier = (window.innerHeight * (14/16)) / currentLevel.height;
+            let relativeWidth = window.innerHeight * (14/16) / height * width;
+            relativeToReal.multiplier = (window.innerHeight * (14/16)) / height;
 
             this.left   = (window.innerWidth - relativeWidth) / 2;
             this.right  = window.innerWidth - ((window.innerWidth - relativeWidth) / 2);
@@ -81,8 +94,8 @@ const borders = new class {
             this.right = window.innerWidth * (15/16);
             relativeToReal.xOffset = this.left;
 
-            let relativeHeight = window.innerWidth * (14/16) / currentLevel.width * currentLevel.height;
-            relativeToReal.multiplier = (window.innerWidth * (14/16)) / currentLevel.width;
+            let relativeHeight = window.innerWidth * (14/16) / width * height;
+            relativeToReal.multiplier = (window.innerWidth * (14/16)) / width;
 
             this.top   = (window.innerHeight - relativeHeight) / 2;
             this.bottom  = window.innerHeight - (window.innerHeight - relativeHeight) / 2;
@@ -98,22 +111,23 @@ const borders = new class {
 };
 
 borders.colour = "Black";
-borders.reEvaluate();
+borders.reEvaluate(200,100);
 
 class Platform {
-    constructor(pos, sidelength) {
+    constructor(pos, relativeSideLength, colour) {
         this.relativePos = pos;
         this.realPos = relativeToReal.convert(pos);
-        this.sidelength = sidelength;
+        this.relativeSidelength = relativeSideLength;
+        this.colour = colour;
     }
     
     draw() {
         ctx.beginPath();
-        ctx.fillStyle = "Black"
-        ctx.fillRect(this.pos.x - (this.sidelength / 2),
-                     this.pos.y - (this.sidelength / 2),
-                     this.sidelength,
-                     this.sidelength);
+        ctx.fillStyle = this.colour;
+        ctx.fillRect(this.realPos.x - (this.sidelength * relativeToReal.multiplier / 2),
+                     this.realPos.y - (this.sidelength * relativeToReal.multiplier / 2),
+                     this.relativeSidelength * relativeToReal.multiplier,
+                     this.relativeSidelength * relativeToReal.multiplier);
         ctx.closePath();
     }
 };
@@ -124,7 +138,7 @@ function initEventListeners() {
         function() { 
             ctx.canvas.width  = window.innerWidth; 
             ctx.canvas.height = window.innerHeight; 
-            borders.reEvaluate();
+            borders.reEvaluate(game.current.width, game.current.height);
         });
     window.addEventListener("mousemove", 
     function(event) {
@@ -219,7 +233,7 @@ const player = new class {
         }
 
         if ((keyPresses.space || keyPresses.w) && this.canJump) {
-            this.velocity.y = this.relativeSideLength * -2;
+            this.velocity.y = this.relativeSideLength * -1;
             this.canJump = false;
         }
 
@@ -232,16 +246,16 @@ const player = new class {
 
     processCollisions() {
         this.canJump = false;
-        if (this.relativePos.y + this.velocity.y > currentLevel.height - (this.relativeSideLength / 2)) {
+        if (this.relativePos.y + this.velocity.y < this.relativeSideLength / 2) {
+            this.velocity.y = 0;
+            this.relativePos.y = this.relativeSideLength / 2;
+        } else if (this.relativePos.y + this.velocity.y > currentLevel.height - (this.relativeSideLength / 2)) {
             this.velocity.y = 0;
             this.relativePos.y = currentLevel.height - (this.relativeSideLength / 2);
             this.canJump = true;
-        } else if (this.relativePos.y + this.velocity.y < this.relativeSideLength / 2) {
-            this.velocity.y = 0;
-            this.relativePos.y = this.relativeSideLength / 2;
         };
         
-        if (this.relativePos + this.velocity.x < this.relativeSideLength / 2) {
+        if (this.relativePos.x + this.velocity.x < this.relativeSideLength / 2) {
             this.velocity.x = 0;
             this.relativePos.x = this.relativeSideLength / 2;
         } else if (this.relativePos.x + this.velocity.x > currentLevel.width - (this.relativeSideLength / 2)) {
@@ -256,7 +270,7 @@ const player = new class {
     update() {
         this.processKeyPresses()
 
-        this.velocity.y += this.gravityStrength / 2;
+        this.velocity.y += this.gravityStrength * Math.pow(this.relativeSideLength, 2) / 750;
 
         // Enforce speed Limit
         if (this.velocity.x >= 10) {
@@ -276,8 +290,6 @@ const player = new class {
 
         this.processCollisions()
 
-        console.log(this.relativePos);
-
         this.realPos = relativeToReal.convert(this.relativePos);
 
         this.draw();
@@ -290,13 +302,7 @@ function animate() {
     requestAnimationFrame(animate);
     borders.draw();
     player.update();
-    currentLevel.draw();
+    // currentLevel.draw();
 };
 
 animate();
-
-/*
-Things which could be messing it up:
-  - I have no clue, could be anything.
-  - Have fun, future me ¯\_(ツ)_/¯
-*/
