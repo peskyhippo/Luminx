@@ -14,216 +14,434 @@ class Vector2 {
 
 const mouse = new Vector2(undefined, undefined);
 
-const keyPresses = {
+const keyEvents = {
     w: false,
     a: false,
     s: false,
     d: false,
+    f: false,
     space: false,
-}
-
-class Level {
-    constructor(width, height) {
-        this.width = width;
-        this.height = height;
-        this.roomsList = [];
-        this.currentRoom = undefined;
-    };
-
-    loadRoom(roomIndex) {
-        if (roomIndex >= this.roomsList.length) {return false};
-        this.currentRoom = this.roomsList[roomIndex];
-        borders.reEvaluate(game.current.width, game.current.height);
-    };
+    mouseDown: false,
+    shift: false,
 };
 
-let currentLevel = new Level(200, 100);
-
-const game = new class{
-    constructor() {
-        this.current = {
-            width: 200, // Change width and height once this is in proper use
-            height: 100,
-            levelID: undefined,
-            roomID: undefined
-        };
-        this.levelList = [/* Levels go in this array. */];
-    };
-
-    drawBorders() {
-
-    }
-};
-
-const relativeToReal = new class {
+const relativeToReal = new (class {
     constructor() {
         // These are defined in borders.reEvaluate()
         this.multiplier = undefined;
         this.xOffset = undefined;
         this.yOffset = undefined;
-    };
+    }
 
     convert(vector) {
-        return new Vector2((vector.x * this.multiplier) + this.xOffset, (vector.y * this.multiplier) + this.yOffset);
-    };
+        return new Vector2(
+            vector.x * this.multiplier + this.xOffset,
+            vector.y * this.multiplier + this.yOffset
+        );
+    }
 
     convertX(x) {
-        return (x * this.multiplier) + this.xOffset
-    };
+        return x * this.multiplier + this.xOffset;
+    }
 
     convertY(y) {
-        return (y * this.multiplier) + this.yOffset
-    };
-};
+        return y * this.multiplier + this.yOffset;
+    }
+})();
 
-const borders = new class {
-    reEvaluate(width, height) {
-        if (window.innerWidth / window.innerHeight > width / height) {
-            this.top    = window.innerHeight / 16;
-            this.bottom = window.innerHeight * (15/16);
-            relativeToReal.yOffset = this.top;
-
-            let relativeWidth = window.innerHeight * (14/16) / height * width;
-            relativeToReal.multiplier = (window.innerHeight * (14/16)) / height;
-
-            this.left   = (window.innerWidth - relativeWidth) / 2;
-            this.right  = window.innerWidth - ((window.innerWidth - relativeWidth) / 2);
-            relativeToReal.xOffset = this.left;
-        } else {
-            this.left    = window.innerWidth / 16;
-            this.right = window.innerWidth * (15/16);
-            relativeToReal.xOffset = this.left;
-
-            let relativeHeight = window.innerWidth * (14/16) / width * height;
-            relativeToReal.multiplier = (window.innerWidth * (14/16)) / width;
-
-            this.top   = (window.innerHeight - relativeHeight) / 2;
-            this.bottom  = window.innerHeight - (window.innerHeight - relativeHeight) / 2;
-            relativeToReal.yOffset = this.top;
-        };
-    };
-
-    draw() {
-        ctx.fillStyle = this.colour
-        ctx.fillRect(0, 0, innerWidth, innerHeight);
-        ctx.clearRect(this.left, this.top, this.right - this.left, this.bottom - this.top);
-    };
-};
-
-borders.colour = "Black";
-borders.reEvaluate(200,100);
-
-class Platform {
-    constructor(pos, relativeSideLength, colour) {
-        this.relativePos = pos;
-        this.realPos = relativeToReal.convert(pos);
-        this.relativeSidelength = relativeSideLength;
+class Block {
+    constructor(relativePos, relativeSideLength, colour) {
+        this.relativePos = relativePos;
+        this.realPos = relativeToReal.convert(relativePos);
+        this.relativeSideLength = relativeSideLength;
         this.colour = colour;
     }
-    
+
     draw() {
         ctx.beginPath();
         ctx.fillStyle = this.colour;
-        ctx.fillRect(this.realPos.x - (this.sidelength * relativeToReal.multiplier / 2),
-                     this.realPos.y - (this.sidelength * relativeToReal.multiplier / 2),
-                     this.relativeSidelength * relativeToReal.multiplier,
-                     this.relativeSidelength * relativeToReal.multiplier);
-        ctx.closePath();
+        // ctx.fillRect(this.realPos.x - (this.sidelength * relativeToReal.multiplier / 2),
+        //              this.realPos.y - (this.sidelength * relativeToReal.multiplier / 2),
+        //              this.relativeSideLength * relativeToReal.multiplier,
+        //              this.relativeSideLength * relativeToReal.multiplier);
+        // ctx.closePath();
+        this.realPos = relativeToReal.convert(this.relativePos);
+        let halfSideLength =
+            (this.relativeSideLength * relativeToReal.multiplier) / 2;
+        ctx.moveTo(
+            this.realPos.x - halfSideLength,
+            this.realPos.y + halfSideLength
+        );
+        ctx.lineTo(
+            this.realPos.x + halfSideLength,
+            this.realPos.y + halfSideLength
+        );
+        ctx.lineTo(
+            this.realPos.x + halfSideLength,
+            this.realPos.y - halfSideLength
+        );
+        ctx.lineTo(
+            this.realPos.x - halfSideLength,
+            this.realPos.y - halfSideLength
+        );
+        ctx.lineTo(
+            this.realPos.x - halfSideLength,
+            this.realPos.y + halfSideLength
+        );
+        ctx.fill();
     }
-};
+}
+
+class BlockCluster {
+    constructor() {}
+}
+
+class Room {
+    constructor(roomID, width, height, objects) {
+        this.ID = roomID;
+        this.width = width;
+        this.height = height;
+        this.objects = objects;
+    }
+
+    drawAll() {
+        this.objects.forEach((object) => {
+            object.draw();
+        });
+    }
+}
+
+class Level {
+    constructor(levelID, roomsList) {
+        this.ID = levelID;
+        this.roomsList = roomsList;
+        this.currentRoomID = undefined;
+        this.current = {
+            width: undefined,
+            height: undefined,
+        };
+        this.loadRoom(0);
+    }
+
+    loadRoom(roomID) {
+        if (roomID >= this.roomsList.length) {
+            console.error("roomID out of range.");
+            return false;
+        }
+        this.currentRoomID = roomID;
+        this.current.width = this.roomsList[roomID].width;
+        this.current.height = this.roomsList[roomID].height;
+    }
+}
+
+const game = new (class {
+    constructor() {
+        this.current = {
+            width: 200, // Change this in a bit
+            height: 100,
+            levelID: 0,
+            roomID: undefined,
+        };
+        this.levelList = [
+            new Level(0, [
+                new Room(0, 300, 150, [
+                    new Block(new Vector2(205, 125), 10, "Black"),
+                    new Block(new Vector2(155, 145), 10, "Black"),
+                ]),
+                new Room(1, 100, 100, [
+                    new Block(new Vector2(150, 75), 10, "Black"),
+                ]),
+            ]),
+        ];
+        this.borders = {
+            top: undefined,
+            bottom: undefined,
+            left: undefined,
+            right: undefined,
+            colour: "Black",
+            draw() {
+                ctx.fillStyle = this.colour;
+                ctx.fillRect(0, 0, innerWidth, innerHeight);
+                ctx.clearRect(
+                    this.left, // TL X
+                    this.top, // TL Y
+                    this.right - this.left, // Width
+                    this.bottom - this.top // Height
+                );
+            },
+        };
+        this.loadRoom(0);
+        this.updateBorders();
+    }
+
+    drawAll() {
+        this.levelList[this.current.levelID].roomsList[
+            this.current.roomID
+        ].drawAll();
+    }
+
+    loadLevel(levelID) {
+        if (levelID >= this.levelList.length) {
+            console.error("levelID out of range.");
+            return false;
+        }
+        this.current.levelID = levelID;
+        this.current.width = this.levelList[levelID].current.width;
+        this.current.height = this.levelList[levelID].current.height;
+        this.updateBorders();
+    }
+
+    loadRoom(roomID) {
+        if (roomID >= this.levelList[this.current.levelID].roomsList.length) {
+            console.error("roomID out of range.");
+            return false;
+        }
+        this.current.roomID = roomID;
+        this.levelList[this.current.levelID].loadRoom(roomID);
+        this.loadLevel(this.current.levelID);
+    }
+
+    updateBorders() {
+        if (
+            window.innerWidth / window.innerHeight >
+            this.current.width / this.current.height
+        ) {
+            this.borders.top = window.innerHeight / 16;
+            this.borders.bottom = window.innerHeight * (15 / 16);
+            relativeToReal.yOffset = this.borders.top;
+
+            let relativeWidth =
+                ((window.innerHeight * (14 / 16)) / this.current.height) *
+                this.current.width;
+            relativeToReal.multiplier =
+                (window.innerHeight * (14 / 16)) / this.current.height;
+
+            this.borders.left = (window.innerWidth - relativeWidth) / 2;
+            this.borders.right =
+                window.innerWidth - (window.innerWidth - relativeWidth) / 2;
+            relativeToReal.xOffset = this.borders.left;
+        } else {
+            this.borders.left = window.innerWidth / 16;
+            this.borders.right = window.innerWidth * (15 / 16);
+            relativeToReal.xOffset = this.borders.left;
+
+            let relativeHeight =
+                ((window.innerWidth * (14 / 16)) / this.current.width) *
+                this.current.height;
+            relativeToReal.multiplier =
+                (window.innerWidth * (14 / 16)) / this.current.width;
+
+            this.borders.top = (window.innerHeight - relativeHeight) / 2;
+            this.borders.bottom =
+                window.innerHeight - (window.innerHeight - relativeHeight) / 2;
+            relativeToReal.yOffset = this.borders.top;
+        }
+    }
+})();
 
 function initEventListeners() {
-    window.addEventListener(
-        'resize', 
-        function() { 
-            ctx.canvas.width  = window.innerWidth; 
-            ctx.canvas.height = window.innerHeight; 
-            borders.reEvaluate(game.current.width, game.current.height);
-        });
-    window.addEventListener("mousemove", 
-    function(event) {
+    window.addEventListener("resize", function () {
+        ctx.canvas.width = window.innerWidth;
+        ctx.canvas.height = window.innerHeight;
+
+        // Fix borders after resize
+        game.updateBorders();
+    });
+
+    window.addEventListener("mousemove", function (event) {
         mouse.x = event.x;
         mouse.y = event.y;
     });
 
-    window.addEventListener("keydown",
-    function(event) {
+    window.addEventListener("keydown", function (event) {
         switch (event.key.toLowerCase()) {
             case "w":
-                keyPresses.w = true;
+                keyEvents.w = true;
                 break;
             case "a":
-                keyPresses.a = true;
+                keyEvents.a = true;
                 break;
             case "s":
-                keyPresses.s = true;
+                keyEvents.s = true;
                 break;
             case "d":
-                keyPresses.d = true;
+                keyEvents.d = true;
+                break;
+            case "f":
+                keyEvents.f = true;
                 break;
             case " ":
-                keyPresses.space = true
+                keyEvents.space = true;
+                break;
+            case "shift":
+                keyEvents.shift = true;
                 break;
             default:
                 break;
         }
     });
 
-    window.addEventListener("keyup",
-    function(event) {
+    window.addEventListener("keyup", function (event) {
         switch (event.key.toLowerCase()) {
             case "w":
-                keyPresses.w = false;
+                keyEvents.w = false;
                 break;
             case "a":
-                keyPresses.a = false;
+                keyEvents.a = false;
                 break;
             case "s":
-                keyPresses.s = false;
+                keyEvents.s = false;
                 break;
             case "d":
-                keyPresses.d = false;
+                keyEvents.d = false;
+                break;
+            case "f":
+                keyEvents.f = false;
                 break;
             case " ":
-                keyPresses.space = false;
+                keyEvents.space = false;
+                break;
+            case "shift":
+                keyEvents.shift = false;
                 break;
             default:
                 break;
         }
     });
-};
 
-const player = new class {
+    window.addEventListener("mousedown", function () {
+        keyEvents.mouseDown = true;
+    });
+
+    window.addEventListener("mouseup", function () {
+        keyEvents.mouseDown = false;
+    });
+}
+
+const player = new (class {
     constructor() {
-        this.relativePos        = new Vector2(currentLevel.width / 2, currentLevel.height / 2);
-        this.realPos            = relativeToReal.convert(this.relativePos);
-        this.gravityStrength    = 1;
-        this.velocity           = new Vector2(0,0);
-        this.relativeSideLength = 20;
-        this.colour             = "Black";
-        this.canJump            = false;
-    };
-    
+        this.relativePos = new Vector2(
+            game.current.width / 2,
+            game.current.height / 2
+        );
+        this.realPos = relativeToReal.convert(this.relativePos);
+        this.gravityStrength = 1;
+        this.velocity = new Vector2(0, 0);
+        this.nextPos = this.relativePos;
+        this.relativeSideLength = 10;
+        this.relativeSize = Math.pow(this.relativeSideLength, 2);
+        this.freeSpirit = false;
+        this.bodyColour = "Black";
+        this.spiritColour = "White";
+        this.canJump = false;
+        this.spiritSize = this.relativeSideLength * 0.7;
+    }
+
     draw() {
+        // Draw Player Body
         ctx.beginPath();
-        ctx.strokeStyle = this.colour;
-        ctx.fillStyle = this.colour;
+        ctx.strokeStyle = this.bodyColour;
+        ctx.fillStyle = this.bodyColour;
 
-        let halfSideLength = this.relativeSideLength * relativeToReal.multiplier / 2;
+        let halfSideLength =
+            (this.relativeSideLength * relativeToReal.multiplier) / 2;
 
-        ctx.moveTo(this.realPos.x - halfSideLength, this.realPos.y + halfSideLength);
-        ctx.lineTo(this.realPos.x + halfSideLength, this.realPos.y + halfSideLength);
-        ctx.lineTo(this.realPos.x + halfSideLength + (this.velocity.x * relativeToReal.multiplier), this.realPos.y - halfSideLength);
-        ctx.lineTo(this.realPos.x - halfSideLength + (this.velocity.x * relativeToReal.multiplier), this.realPos.y - halfSideLength);
-        ctx.lineTo(this.realPos.x - halfSideLength, this.realPos.y + halfSideLength);
+        ctx.moveTo(
+            this.realPos.x - halfSideLength,
+            this.realPos.y + halfSideLength
+        );
+        ctx.lineTo(
+            this.realPos.x + halfSideLength,
+            this.realPos.y + halfSideLength
+        );
+        ctx.lineTo(
+            this.realPos.x +
+                halfSideLength +
+                this.velocity.x * relativeToReal.multiplier,
+            this.realPos.y - halfSideLength
+        );
+        ctx.lineTo(
+            this.realPos.x -
+                halfSideLength +
+                this.velocity.x * relativeToReal.multiplier,
+            this.realPos.y - halfSideLength
+        );
+        ctx.lineTo(
+            this.realPos.x - halfSideLength,
+            this.realPos.y + halfSideLength
+        );
         ctx.fill();
-    };
 
-    processKeyPresses() {
-        if (keyPresses.a && !keyPresses.d) {
-            this.velocity.x -= 1.5;
-        } else if (keyPresses.d && !keyPresses.a) {
-            this.velocity.x += 1.5;
+        // Draw Spirit
+        // Do not tweak, only touch it if you re-write the whole function.
+        // I have no clue how it works but it does somehow.
+        ctx.beginPath();
+        ctx.strokeStyle = this.spiritColour;
+        ctx.fillStyle = this.spiritColour;
+
+        halfSideLength = (this.spiritSize * relativeToReal.multiplier) / 2;
+
+        ctx.moveTo(
+            this.realPos.x -
+                halfSideLength +
+                ((this.relativeSideLength - this.spiritSize) *
+                    this.velocity.x *
+                    relativeToReal.multiplier) /
+                    (this.relativeSideLength * 2),
+            this.realPos.y + halfSideLength
+        );
+        ctx.lineTo(
+            this.realPos.x +
+                halfSideLength +
+                ((this.relativeSideLength - this.spiritSize) *
+                    this.velocity.x *
+                    relativeToReal.multiplier) /
+                    (this.relativeSideLength * 2),
+            this.realPos.y + halfSideLength
+        );
+        ctx.lineTo(
+            this.realPos.x +
+                halfSideLength +
+                ((this.relativeSideLength - this.spiritSize) *
+                    this.velocity.x *
+                    relativeToReal.multiplier) /
+                    (this.relativeSideLength * 2) +
+                (this.velocity.x *
+                    relativeToReal.multiplier *
+                    this.spiritSize) /
+                    this.relativeSideLength,
+            this.realPos.y - halfSideLength
+        );
+        ctx.lineTo(
+            this.realPos.x -
+                halfSideLength +
+                ((this.relativeSideLength - this.spiritSize) *
+                    this.velocity.x *
+                    relativeToReal.multiplier) /
+                    (this.relativeSideLength * 2) +
+                (this.velocity.x *
+                    relativeToReal.multiplier *
+                    this.spiritSize) /
+                    this.relativeSideLength,
+            this.realPos.y - halfSideLength
+        );
+        ctx.lineTo(
+            this.realPos.x -
+                halfSideLength +
+                ((this.relativeSideLength - this.spiritSize) *
+                    this.velocity.x *
+                    relativeToReal.multiplier) /
+                    (this.relativeSideLength * 2),
+            this.realPos.y + halfSideLength
+        );
+        ctx.fill();
+    }
+
+    processkeyEvents() {
+        if (keyEvents.a && !keyEvents.d) {
+            this.velocity.x -= 0.5;
+        } else if (keyEvents.d && !keyEvents.a) {
+            this.velocity.x += 0.5;
         } else {
             if (this.velocity.x < -0.5 || this.velocity.x > 0.5) {
                 this.velocity.x /= 1.2;
@@ -232,77 +450,158 @@ const player = new class {
             }
         }
 
-        if ((keyPresses.space || keyPresses.w) && this.canJump) {
-            this.velocity.y = this.relativeSideLength * -1;
+        if ((keyEvents.space || keyEvents.w) && this.canJump) {
+            this.velocity.y = this.relativeSize * -1;
             this.canJump = false;
         }
 
-        if (keyPresses.s) {
-            this.gravityStrength = 2
+        if (keyEvents.s) {
+            this.gravityStrength = 2;
         } else {
-            this.gravityStrength = 1
+            this.gravityStrength = 1;
         }
-    };
+
+        this.freeSpirit = keyEvents.shift;
+    }
+
+    willCollide(Block) {
+        let dist = (Block.relativeSideLength + this.relativeSideLength) / 2;
+        return (
+            Block.relativePos.x - dist <= this.nextPos.x &&
+            this.nextPos.x <= Block.relativePos.x + dist &&
+            Block.relativePos.y - dist <= this.nextPos.y &&
+            this.nextPos.y <= Block.relativePos.y + dist
+        );
+    }
 
     processCollisions() {
         this.canJump = false;
-        if (this.relativePos.y + this.velocity.y < this.relativeSideLength / 2) {
+        if (this.nextPos.y < this.relativeSideLength / 2) {
             this.velocity.y = 0;
             this.relativePos.y = this.relativeSideLength / 2;
-        } else if (this.relativePos.y + this.velocity.y > currentLevel.height - (this.relativeSideLength / 2)) {
+        } else if (
+            this.nextPos.y >
+            game.current.height - this.relativeSideLength / 2
+        ) {
             this.velocity.y = 0;
-            this.relativePos.y = currentLevel.height - (this.relativeSideLength / 2);
+            this.relativePos.y =
+                game.current.height - this.relativeSideLength / 2;
             this.canJump = true;
-        };
-        
-        if (this.relativePos.x + this.velocity.x < this.relativeSideLength / 2) {
-            this.velocity.x = 0;
-            this.relativePos.x = this.relativeSideLength / 2;
-        } else if (this.relativePos.x + this.velocity.x > currentLevel.width - (this.relativeSideLength / 2)) {
-            this.velocity.x = 0;
-            this.relativePos.x = currentLevel.width - (this.relativeSideLength / 2);
-        };
-
-        // Make code for collisions with platforms and blocks here
-        // Again, have fun future me :)
-    };
-
-    update() {
-        this.processKeyPresses()
-
-        this.velocity.y += this.gravityStrength * Math.pow(this.relativeSideLength, 2) / 750;
-
-        // Enforce speed Limit
-        if (this.velocity.x >= 10) {
-            this.velocity.x = 10;
-        } else if (this.velocity.x <= -10) {
-            this.velocity.x = -10;
         }
 
-        if (this.velocity.y >= 50) {
-            this.velocity.y = 50;
-        } else if (this.velocity.y <= -10) {
-            this.velocity.y = -10;
+        if (this.nextPos.x < this.relativeSideLength / 2) {
+            this.velocity.x = 0;
+            this.relativePos.x = this.relativeSideLength / 2;
+        } else if (
+            this.nextPos.x >
+            game.current.width - this.relativeSideLength / 2
+        ) {
+            this.velocity.x = 0;
+            this.relativePos.x =
+                game.current.width - this.relativeSideLength / 2;
+        }
+
+        // Code for collisions with Blocks/blocks here [UNFINISHED]
+        game.levelList[game.current.levelID].roomsList[
+            game.current.roomID
+        ].objects.forEach((Block) => {
+            if (this.willCollide(Block)) {
+                let dist =
+                    (this.relativeSideLength + Block.relativeSideLength) / 2;
+                let distX = this.nextPos.x - Block.relativePos.x;
+                let distY = this.nextPos.y - Block.relativePos.y;
+
+                if (-1 * distY >= Math.abs(distX)) {
+                    // Top section
+                    this.velocity.y = this.velocity.y < 0 ? this.velocity.y : 0;
+                    this.relativePos.y = Block.relativePos.y - dist;
+                    this.canJump = true;
+                } else if (-1 * distX > Math.abs(distY)) {
+                    // Left section
+                    this.velocity.x = this.velocity.x < 0 ? this.velocity.x : 0;
+                    this.relativePos.x = Block.relativePos.x - dist;
+                } else if (distX > Math.abs(distY)) {
+                    // Right section
+                    this.velocity.x = this.velocity.x > 0 ? this.velocity.x : 0;
+                    this.relativePos.x = Block.relativePos.x + dist;
+                } else if (distY >= Math.abs(distX)) {
+                    // Bottom section
+                    this.velocity.y = this.velocity.y > 0 ? this.velocity.y : 0;
+                    this.relativePos.y = Block.relativePos.y + dist;
+                }
+            }
+        });
+    }
+
+    update() {
+        this.processkeyEvents();
+
+        this.velocity.y += (this.gravityStrength * this.relativeSize) / 400;
+        let qwertX = 25;
+        let qwertY = 50;
+        // Enforce speed Limit
+        if (this.velocity.x >= this.relativeSize / qwertX) {
+            this.velocity.x = this.relativeSize / qwertX;
+        } else if (this.velocity.x <= (-1 * this.relativeSize) / qwertX) {
+            this.velocity.x = (-1 * this.relativeSize) / qwertX;
+        }
+
+        if (this.velocity.y >= this.relativeSize) {
+            this.velocity.y = this.relativeSize;
+        } else if (this.velocity.y <= (-2 * this.relativeSize) / qwertY) {
+            this.velocity.y = (-2 * this.relativeSize) / qwertY;
         }
 
         this.relativePos.x += this.velocity.x;
         this.relativePos.y += this.velocity.y;
 
-        this.processCollisions()
+        this.processCollisions();
 
         this.realPos = relativeToReal.convert(this.relativePos);
 
+        if (this.freeSpirit) {
+            if (this.spiritSize > 3.5) {
+                this.spiritSize /= 1.2;
+            } else {
+                this.spiritSize = 3;
+            }
+        } else {
+            if (this.spiritSize < this.relativeSideLength * 0.675) {
+                this.spiritSize *= 0.9;
+                this.spiritSize += 1;
+            } else {
+                this.spiritSize = this.relativeSideLength * 0.7;
+            }
+        }
+
         this.draw();
-    };
-};
+
+        this.nextPos = new Vector2(
+            this.relativePos.x + this.velocity.x,
+            this.relativePos.y + this.velocity.y
+        );
+    }
+})();
+
+hacks = false;
 
 initEventListeners();
 
 function animate() {
     requestAnimationFrame(animate);
-    borders.draw();
-    player.update();
-    // currentLevel.draw();
-};
+    if (!(hacks && keyEvents.f)) {
+        if (hacks && keyEvents.mouseDown) {
+            player.relativePos.x =
+                (mouse.x - relativeToReal.xOffset) / relativeToReal.multiplier;
+            player.relativePos.y =
+                (mouse.y - relativeToReal.yOffset) / relativeToReal.multiplier;
+            player.velocity.x = 0;
+            player.velocity.y = 0;
+        }
+        game.borders.draw();
+        game.drawAll();
+        player.update();
+    }
+}
 
 animate();
