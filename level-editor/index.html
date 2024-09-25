@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>Luminx Level Editor</title>
+        <link rel="icon" href="../assets/images/favicon.ico" />
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta
+            name="description"
+            content="Level editor for Luminx because why not."
+        />
+        <style>
+            @font-face {
+                font-family: "m-plus-rounded-1c-extrabold";
+                src: url(../assets/fonts/M_PLUS_Rounded_1c/MPLUSRounded1c-ExtraBold.ttf);
+            }
+            @font-face {
+                font-family: "m-plus-rounded-1c-bold";
+                src: url(../assets/fonts/M_PLUS_Rounded_1c/MPLUSRounded1c-Bold.ttf);
+            }
+            @font-face {
+                font-family: "m-plus-rounded-1c-medium";
+                src: url(../assets/fonts/M_PLUS_Rounded_1c/MPLUSRounded1c-Medium.ttf);
+            }
+        </style>
+        <style>
+            @font-face {
+                font-family: "roboto-black";
+                src: url(../assets/fonts/Roboto/Roboto-Black.ttf);
+            }
+            @font-face {
+                font-family: "roboto-bold";
+                src: url(../assets/fonts/Roboto/Roboto-Bold.ttf);
+            }
+            @font-face {
+                font-family: "roboto-medium";
+                src: url(../assets/fonts/Roboto/Roboto-Medium.ttf);
+            }
+        </style>
+        <style>
+            body {
+                background-color: #5d5d5d;
+            }
+            html,
+            body {
+                margin: 0 !important;
+                border: 0 !important;
+                padding: 0 !important;
+                width: 100%;
+                height: 100%;
+                overflow: hidden;
+            }
+            div#levels-container {
+                padding: 20px;
+                display: flex;
+            }
+            div.level {
+                margin: 20px;
+                border-radius: 25px;
+                width: 100px;
+                height: 100px;
+                background-color: #555555;
+            }
+            div.level p {
+                margin: 0;
+                text-align: center;
+                font-family: "roboto-black";
+            }
+            div.level:hover {
+                background-color: #666666;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="levels-container">
+            <div class="level"><p>[LEVEL NAME]</p></div>
+        </div>
+    </body>
+</html>

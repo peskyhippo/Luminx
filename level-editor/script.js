@@ -1,4 +1,4 @@
-let canvas = document.getElementById("mainCanvas");
+let canvas = document.getElementById("editor-canvas");
 
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
@@ -19,7 +19,6 @@ const keyEvents = {
     a: false,
     s: false,
     d: false,
-    f: false,
     space: false,
     mouseDown: false,
     shift: false,
@@ -68,32 +67,35 @@ class Block {
         this.realPos = relativeToReal.convert(this.relativePos);
         let halfSideLength =
             (this.relativeSideLength * relativeToReal.multiplier) / 2;
-        ctx.moveTo(
+
+        ctx.fillRect(
             this.realPos.x - halfSideLength,
-            this.realPos.y + halfSideLength
+            this.realPos.y - halfSideLength,
+            this.relativeSideLength * relativeToReal.multiplier,
+            this.relativeSideLength * relativeToReal.multiplier
         );
-        ctx.lineTo(
-            this.realPos.x + halfSideLength,
-            this.realPos.y + halfSideLength
-        );
-        ctx.lineTo(
-            this.realPos.x + halfSideLength,
-            this.realPos.y - halfSideLength
-        );
-        ctx.lineTo(
-            this.realPos.x - halfSideLength,
-            this.realPos.y - halfSideLength
-        );
-        ctx.lineTo(
-            this.realPos.x - halfSideLength,
-            this.realPos.y + halfSideLength
-        );
+        // ctx.moveTo(
+        //     this.realPos.x - halfSideLength,
+        //     this.realPos.y + halfSideLength
+        // );
+        // ctx.lineTo(
+        //     this.realPos.x + halfSideLength,
+        //     this.realPos.y + halfSideLength
+        // );
+        // ctx.lineTo(
+        //     this.realPos.x + halfSideLength,
+        //     this.realPos.y - halfSideLength
+        // );
+        // ctx.lineTo(
+        //     this.realPos.x - halfSideLength,
+        //     this.realPos.y - halfSideLength
+        // );
+        // ctx.lineTo(
+        //     this.realPos.x - halfSideLength,
+        //     this.realPos.y + halfSideLength
+        // );
         ctx.fill();
     }
-}
-
-class BlockCluster {
-    constructor() {}
 }
 
 class Room {
@@ -131,22 +133,28 @@ class Level {
         this.currentRoomID = roomID;
         this.current.width = this.roomsList[roomID].width;
         this.current.height = this.roomsList[roomID].height;
+
+        return this.roomsList[roomID];
     }
 }
 
 const game = new (class {
     constructor() {
+        this.paused = false;
         this.current = {
-            width: 200, // Change this in a bit
-            height: 100,
+            width: undefined,
+            height: undefined,
             levelID: 0,
+
             roomID: undefined,
         };
         this.levelList = [
             new Level(0, [
                 new Room(0, 300, 150, [
-                    new Block(new Vector2(205, 125), 10, "Black"),
-                    new Block(new Vector2(155, 145), 10, "Black"),
+                    new Block(new Vector2(205, 115), 10, "Black"),
+                    new Block(new Vector2(155, 135), 10, "Black"),
+                    new Block(new Vector2(150, 100), 20, "Black"),
+                    new Block(new Vector2(155, 85), 10, "Black"),
                 ]),
                 new Room(1, 100, 100, [
                     new Block(new Vector2(150, 75), 10, "Black"),
@@ -197,7 +205,9 @@ const game = new (class {
             return false;
         }
         this.current.roomID = roomID;
-        this.levelList[this.current.levelID].loadRoom(roomID);
+        let currentRoom = this.levelList[this.current.levelID].loadRoom(roomID);
+        this.current.width = currentRoom.height;
+        this.current.height = currentRoom.height;
         this.loadLevel(this.current.levelID);
     }
 
@@ -238,85 +248,6 @@ const game = new (class {
         }
     }
 })();
-
-function initEventListeners() {
-    window.addEventListener("resize", function () {
-        ctx.canvas.width = window.innerWidth;
-        ctx.canvas.height = window.innerHeight;
-
-        // Fix borders after resize
-        game.updateBorders();
-    });
-
-    window.addEventListener("mousemove", function (event) {
-        mouse.x = event.x;
-        mouse.y = event.y;
-    });
-
-    window.addEventListener("keydown", function (event) {
-        switch (event.key.toLowerCase()) {
-            case "w":
-                keyEvents.w = true;
-                break;
-            case "a":
-                keyEvents.a = true;
-                break;
-            case "s":
-                keyEvents.s = true;
-                break;
-            case "d":
-                keyEvents.d = true;
-                break;
-            case "f":
-                keyEvents.f = true;
-                break;
-            case " ":
-                keyEvents.space = true;
-                break;
-            case "shift":
-                keyEvents.shift = true;
-                break;
-            default:
-                break;
-        }
-    });
-
-    window.addEventListener("keyup", function (event) {
-        switch (event.key.toLowerCase()) {
-            case "w":
-                keyEvents.w = false;
-                break;
-            case "a":
-                keyEvents.a = false;
-                break;
-            case "s":
-                keyEvents.s = false;
-                break;
-            case "d":
-                keyEvents.d = false;
-                break;
-            case "f":
-                keyEvents.f = false;
-                break;
-            case " ":
-                keyEvents.space = false;
-                break;
-            case "shift":
-                keyEvents.shift = false;
-                break;
-            default:
-                break;
-        }
-    });
-
-    window.addEventListener("mousedown", function () {
-        keyEvents.mouseDown = true;
-    });
-
-    window.addEventListener("mouseup", function () {
-        keyEvents.mouseDown = false;
-    });
-}
 
 const player = new (class {
     constructor() {
@@ -438,10 +369,13 @@ const player = new (class {
     }
 
     processkeyEvents() {
+        let xDirection = 0;
         if (keyEvents.a && !keyEvents.d) {
             this.velocity.x -= 0.5;
+            xDirection = -1;
         } else if (keyEvents.d && !keyEvents.a) {
             this.velocity.x += 0.5;
+            xDirection = 1;
         } else {
             if (this.velocity.x < -0.5 || this.velocity.x > 0.5) {
                 this.velocity.x /= 1.2;
@@ -461,7 +395,7 @@ const player = new (class {
             this.gravityStrength = 1;
         }
 
-        this.freeSpirit = keyEvents.shift;
+        return xDirection;
     }
 
     willCollide(Block) {
@@ -477,26 +411,26 @@ const player = new (class {
     processCollisions() {
         this.canJump = false;
         if (this.nextPos.y < this.relativeSideLength / 2) {
-            this.velocity.y = 0;
+            this.velocity.y = this.velocity.y > 0 ? this.velocity.y : 0;
             this.relativePos.y = this.relativeSideLength / 2;
         } else if (
             this.nextPos.y >
             game.current.height - this.relativeSideLength / 2
         ) {
-            this.velocity.y = 0;
+            this.velocity.y = this.velocity.y < 0 ? this.velocity.y : 0;
             this.relativePos.y =
                 game.current.height - this.relativeSideLength / 2;
             this.canJump = true;
         }
 
         if (this.nextPos.x < this.relativeSideLength / 2) {
-            this.velocity.x = 0;
+            this.velocity.x = this.velocity.x > 0 ? this.velocity.x : 0;
             this.relativePos.x = this.relativeSideLength / 2;
         } else if (
             this.nextPos.x >
             game.current.width - this.relativeSideLength / 2
         ) {
-            this.velocity.x = 0;
+            this.velocity.x = this.velocity.x < 0 ? this.velocity.x : 0;
             this.relativePos.x =
                 game.current.width - this.relativeSideLength / 2;
         }
@@ -534,36 +468,49 @@ const player = new (class {
     }
 
     update() {
-        this.processkeyEvents();
+        let xDirection = this.processkeyEvents();
 
-        this.velocity.y += (this.gravityStrength * this.relativeSize) / 400;
-        let qwertX = 25;
-        let qwertY = 50;
-        // Enforce speed Limit
-        if (this.velocity.x >= this.relativeSize / qwertX) {
-            this.velocity.x = this.relativeSize / qwertX;
-        } else if (this.velocity.x <= (-1 * this.relativeSize) / qwertX) {
-            this.velocity.x = (-1 * this.relativeSize) / qwertX;
+        if (!this.freeSpirit) {
+            this.velocity.y += (this.gravityStrength * this.relativeSize) / 350;
+            let qwertX = 25;
+            let qwertY = 50;
+            // Enforce speed Limit
+            if (this.velocity.x >= this.relativeSize / qwertX) {
+                this.velocity.x = this.relativeSize / qwertX;
+            } else if (this.velocity.x <= (-1 * this.relativeSize) / qwertX) {
+                this.velocity.x = (-1 * this.relativeSize) / qwertX;
+            }
+
+            if (this.velocity.y >= this.relativeSize) {
+                this.velocity.y = this.relativeSize;
+            } else if (this.velocity.y <= (-2 * this.relativeSize) / qwertY) {
+                this.velocity.y = (-2 * this.relativeSize) / qwertY;
+            }
+
+            this.relativePos.x += this.velocity.x;
+            this.relativePos.y += this.velocity.y;
+
+            this.processCollisions();
+        } else {
+            this.velocity.x = 0;
+            this.velocity.y = 0;
+            this.relativePos = new Vector2(
+                (Math.floor(this.relativePos.x / this.relativeSideLength) +
+                    0.5) *
+                    this.relativeSideLength,
+                (Math.floor(this.relativePos.y / this.relativeSideLength) +
+                    0.5) *
+                    this.relativeSideLength
+            );
         }
-
-        if (this.velocity.y >= this.relativeSize) {
-            this.velocity.y = this.relativeSize;
-        } else if (this.velocity.y <= (-2 * this.relativeSize) / qwertY) {
-            this.velocity.y = (-2 * this.relativeSize) / qwertY;
-        }
-
-        this.relativePos.x += this.velocity.x;
-        this.relativePos.y += this.velocity.y;
-
-        this.processCollisions();
 
         this.realPos = relativeToReal.convert(this.relativePos);
 
         if (this.freeSpirit) {
-            if (this.spiritSize > 3.5) {
+            if (this.spiritSize > this.relativeSideLength * 0.35) {
                 this.spiritSize /= 1.2;
             } else {
-                this.spiritSize = 3;
+                this.spiritSize = this.relativeSideLength * 0.3;
             }
         } else {
             if (this.spiritSize < this.relativeSideLength * 0.675) {
@@ -574,30 +521,122 @@ const player = new (class {
             }
         }
 
+        if (this.spiritSize == this.relativeSideLength * 0.3) {
+            game.levelList[game.current.levelID].roomsList[
+                game.current.roomID
+            ].objects.push(
+                new Block(
+                    this.relativePos,
+                    this.relativeSideLength,
+                    this.colour
+                )
+            );
+        } // TODO: Make the player inhabit the block when shift is released
+        // and make the player inhabiting work properly
+
         this.draw();
 
         this.nextPos = new Vector2(
-            this.relativePos.x + this.velocity.x,
-            this.relativePos.y + this.velocity.y
+            this.relativePos.x + this.velocity.x + 0.5 * xDirection,
+            this.relativePos.y +
+                this.velocity.y +
+                (this.gravityStrength * this.relativeSize) / 350
         );
     }
 })();
 
 hacks = false;
 
+function initEventListeners() {
+    window.addEventListener("resize", function () {
+        ctx.canvas.width = window.innerWidth;
+        ctx.canvas.height = window.innerHeight;
+
+        // Fix borders after resize
+        game.updateBorders();
+    });
+
+    window.addEventListener("mousemove", function (event) {
+        mouse.x = event.x;
+        mouse.y = event.y;
+    });
+
+    window.addEventListener("keydown", function (event) {
+        switch (event.key.toLowerCase()) {
+            case "w":
+                keyEvents.w = true;
+                break;
+            case "a":
+                keyEvents.a = true;
+                break;
+            case "s":
+                keyEvents.s = true;
+                break;
+            case "d":
+                keyEvents.d = true;
+                break;
+            case "f":
+                game.paused = true;
+                break;
+            case " ":
+                keyEvents.space = true;
+                break;
+            case "shift":
+                player.freeSpirit = true;
+                break;
+            default:
+                break;
+        }
+    });
+
+    window.addEventListener("keyup", function (event) {
+        switch (event.key.toLowerCase()) {
+            case "a":
+                keyEvents.a = false;
+                break;
+            case "s":
+                keyEvents.s = false;
+                break;
+            case "d":
+                keyEvents.d = false;
+                break;
+            case "f":
+                game.paused = false;
+                break;
+            case "w":
+            case " ":
+                keyEvents.space = false;
+                break;
+            case "shift":
+                player.freeSpirit = false;
+                break;
+            default:
+                break;
+        }
+    });
+
+    window.addEventListener("mousedown", function () {
+        keyEvents.mouseDown = true;
+    });
+
+    window.addEventListener("mouseup", function () {
+        keyEvents.mouseDown = false;
+    });
+}
+
 initEventListeners();
 
 function animate() {
     requestAnimationFrame(animate);
-    if (!(hacks && keyEvents.f)) {
-        if (hacks && keyEvents.mouseDown) {
-            player.relativePos.x =
-                (mouse.x - relativeToReal.xOffset) / relativeToReal.multiplier;
-            player.relativePos.y =
-                (mouse.y - relativeToReal.yOffset) / relativeToReal.multiplier;
-            player.velocity.x = 0;
-            player.velocity.y = 0;
-        }
+    if (!(hacks && game.paused)) {
+        // if (hacks && keyEvents.mouseDown) {
+        //     player.relativePos.x =
+        //         (mouse.x - relativeToReal.xOffset) / relativeToReal.multiplier;
+        //     player.relativePos.y =
+        //         (mouse.y - relativeToReal.yOffset) / relativeToReal.multiplier;
+        //     player.velocity.x = 0;
+        //     player.velocity.y = 0;
+        // }
         game.borders.draw();
         game.drawAll();
         player.update();
